@@ -95,7 +95,6 @@ def create_tables(conn):
     conn.commit()
 
 def insert_block_data(conn, block_info):
-    with conn.cursor() as cur:
         cur.execute(sql.SQL("""
             INSERT INTO blocks (block_hash, block_height, previous_block_hash, merkle_root, timestamp, nonce, difficulty, confirmations)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
@@ -110,10 +109,8 @@ def insert_block_data(conn, block_info):
             block_info['difficulty'],
             block_info['confirmations']
         ))
-    conn.commit()
 
 def insert_tx_data(conn, tx):
-    with conn.cursor() as cur:
         cur.execute(sql.SQL("""
             INSERT INTO transactions (txid, block_hash, version, size, lock_time)
             VALUES (%s, %s, %s, %s, %s)
@@ -161,8 +158,6 @@ def insert_tx_data(conn, tx):
                     vout['scriptPubKey']['asm']
                 ))
 
-    conn.commit()
-
 def timestamp_to_datetime(timestamp):
     return datetime.datetime.fromtimestamp(timestamp)
 
@@ -177,18 +172,20 @@ if __name__ == "__main__":
     # block_count = bitcoin_rpc("getblockcount")['result']
     start = 840000
     end = 840143
-    for i in range(start, end+1):
-        print("%d of %d"%(i-start+1,end+1-start))
-        # 获取区块
-        block_hash = bitcoin_rpc("getblockhash", [i])['result']
-        block_info = bitcoin_rpc("getblock", [block_hash])['result']
+    with conn.cursor() as cur:
+        for i in range(start, end+1):
+            print("%d of %d"%(i-start+1,end+1-start))
+            # 获取区块
+            block_hash = bitcoin_rpc("getblockhash", [i])['result']
+            block_info = bitcoin_rpc("getblock", [block_hash])['result']
 
-        # 插入区块数据到 PostgreSQL
-        insert_block_data(conn, block_info)
+            # 插入区块数据到 PostgreSQL
+            insert_block_data(conn, block_info)
 
-        for tx in block_info['tx']:
-            tx_hex = bitcoin_rpc("getrawtransaction", [tx])['result']
-            tx_info = bitcoin_rpc("decoderawtransaction", [tx_hex])['result']
-            insert_tx_data(conn, tx_info)
+            for tx in block_info['tx']:
+                tx_hex = bitcoin_rpc("getrawtransaction", [tx])['result']
+                tx_info = bitcoin_rpc("decoderawtransaction", [tx_hex])['result']
+                insert_tx_data(conn, tx_info)
+    conn.commit()
     # 关闭 PostgreSQL 连接
     conn.close()
