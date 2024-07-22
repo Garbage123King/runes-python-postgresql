@@ -12,3 +12,13 @@ drop table blocks cascade;
 drop table inputs cascade;
 ```
 
+This shows you succeeded:
+```
+postgres=# select count(*) from transactions;
+ count  
+--------
+ 694770
+(1 行记录)
+
+```
+

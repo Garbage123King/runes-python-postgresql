@@ -172,20 +172,26 @@ if __name__ == "__main__":
     # block_count = bitcoin_rpc("getblockcount")['result']
     start = 840000
     end = 840143
-    with conn.cursor() as cur:
-        for i in range(start, end+1):
-            print("%d of %d"%(i-start+1,end+1-start))
-            # 获取区块
-            block_hash = bitcoin_rpc("getblockhash", [i])['result']
-            block_info = bitcoin_rpc("getblock", [block_hash])['result']
+    for i in range(start, end+1):
+        print("%d of %d"%(i-start+1,end+1-start))
+        # 获取区块
+        block_hash = bitcoin_rpc("getblockhash", [i])['result']
+        block_info = bitcoin_rpc("getblock", [block_hash])['result']
+        # 一次性获取所有交易的原始数据
+        tx_hashes = [tx for tx in block_info['tx']]
+        tx_hexs = [bitcoin_rpc("getrawtransaction", [tx])['result'] for tx in tx_hashes]
 
+        # 一次性解码所有交易
+        tx_infos = [bitcoin_rpc("decoderawtransaction", [tx_hex])['result'] for tx_hex in tx_hexs]
+
+        # 然后将区块信息和交易信息批量插入到 PostgreSQL
+        with conn.cursor() as cur:
             # 插入区块数据到 PostgreSQL
             insert_block_data(conn, block_info)
-
             for tx in block_info['tx']:
-                tx_hex = bitcoin_rpc("getrawtransaction", [tx])['result']
-                tx_info = bitcoin_rpc("decoderawtransaction", [tx_hex])['result']
+                tx_info = next(info for info in tx_infos if info['txid'] == tx)
                 insert_tx_data(conn, tx_info)
+
     conn.commit()
     # 关闭 PostgreSQL 连接
     conn.close()
